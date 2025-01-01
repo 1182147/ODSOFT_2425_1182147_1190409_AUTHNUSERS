@@ -12,7 +12,7 @@ pipeline {
         TEST_SERVER_PORT = 'to-be-filled'
         PROD_SERVER_PORT = '2228'
 
-        IMAGE_NAME = 'lmsauthnusers'
+        IMAGE_NAME = 'lmsusers'
         IMAGE_TAG = 'latest'
     }
 
@@ -26,11 +26,15 @@ pipeline {
         stage('Clean Install') {
             steps {
                 script {
-                    if(isUnix()) {
-                        sh "mvn clean compile test-compile"
-                    } else {
-                        bat "mvn clean compile test-compile"
-                    }
+                    sh "mvn clean install"
+                }
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                script {
+                    sh "docker build -t lmsusers ."
                 }
             }
         }
@@ -38,9 +42,9 @@ pipeline {
         // For rollback purposes it is always valuable to keep the artifact of
         // the built binary.
         stage('Archive JAR Artifact') {
-             steps {
-                  archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: false
-             }
+            steps {
+                archiveArtifacts artifacts: 'target/*.jar', allowEmptyArchive: false
+            }
         }
 
 //         stage('Deploy Development Environment') {
@@ -49,21 +53,51 @@ pipeline {
 //         stage('Deploy Testing Environment') {
 //         }
 
-        stage('Deploy Production Environment') {
-            // This mimics the 'CREATE IF NOT EXISTS' which POSTGRES does not have.
-            // POSTGRES SHIT = psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'users'" | grep -q 1 && echo "Database 'users' already initialized" || psql -U postgres -c "CREATE DATABASE users"
-            // POSTGRES SHIT = psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = 'books'" | grep -q 1 && echo "Database 'books' already initialized" || psql -U postgres -c "CREATE DATABASE books"
+        stage('Deploy Production Infrastructure') {
+            script {
+                sh """
+                    if ! docker ps --format '{{.Names}}' | grep -q rabbitmq_in_lms_network; then
+                        docker compose -f docker-compose-rabbitmq+postgres.yml up -d
+                    else
+                        echo "RabbitMQ container already running."
+                    fi
+
+                    if ! docker ps --format '{{.Names}}' | grep -q postgres_in_lms_network; then
+                        docker compose -f docker-compose-rabbitmq+postgres.yml up -d
+                    else
+                        echo "Postgres container already running."
+                    fi
+
+                    for i in $(seq 1 5)
+                    do
+                        echo "Attempt $i to Health-Check Postgres Container"
+                        if docker inspect --format='{{json .State.Health.Status}}' postgres_in_lms_network | grep healthy; then
+                            docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''users'\''" | grep -q 1 && echo "Database '\''users'\'' already initialized" || psql -U postgres -c "CREATE DATABASE users;"'
+                            docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''books'\''" | grep -q 1 && echo "Database '\''books'\'' already initialized" || psql -U postgres -c "CREATE DATABASE books;"'
+                            exit 0
+                        fi
+                        sleep 10
+                    done
+                    echo "Postgres container failed to pass HealthChecks."
+                    exit 1
+                """
+            }
         }
 
         stage('Deploy') {
             steps {
                 script {
-                    if(isUnix()) {
-                        sh "JENKINS_NODE_COOKIE=dontKillMe java -jar ./target/psoft-g1-0.0.1-SNAPSHOT.jar --server.port=2228 > output.log 2>&1 &"
-                    } else {
-                        bat "set JENKINS_NODE_COOKIE=dontKillMe && start java -jar .\\target\\psoft-g1-0.0.1-SNAPSHOT.jar --server.port=2228 > output.log 2>&1"
-                    }
+                    sh "docker compose up -d --force-recreate"
                 }
+            }
+        }
+
+        post {
+            success {
+                echo 'Pipeline completed successfully!'
+            }
+            failure {
+                echo 'Pipeline failed!'
             }
         }
     }

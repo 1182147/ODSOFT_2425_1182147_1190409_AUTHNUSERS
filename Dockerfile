@@ -1,14 +1,28 @@
-# Use the official OpenJDK 21 slim image (Debian-based, Ubuntu-compatible)
-FROM openjdk:21-jdk-slim
+# Use a Maven image with JDK installed
+FROM maven:3.8.8-eclipse-temurin-21-alpine AS build
 
-# Set a working directory inside the container
+# Set working directory in the container
 WORKDIR /app
 
-# Copy the JAR file into the container
-COPY target/LMSUsers-0.0.1-SNAPSHOT.jar /app/app.jar
+# Copy the pom.xml and download dependencies
+COPY ../pom.xml .
+RUN mvn dependency:go-offline
+
+# Copy the rest of the project files
+COPY ../src ./src
+
+# Package the application
+RUN mvn package
+
+
+# Run the app using the JAR (if it is a standalone application)
+FROM openjdk:21-jdk-slim
+
+WORKDIR /app
+
+COPY --from=build /app/target/*.jar app.jar
 
 # Informative only; it has no influence in the port effectively exposed by the container.
 #EXPOSE 8080
 
-# Set the command to run the JAR file
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
