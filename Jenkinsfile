@@ -54,33 +54,35 @@ pipeline {
 //         }
 
         stage('Deploy Production Infrastructure') {
-            script {
-                sh '''
-                    if ! docker ps --format '{{.Names}}' | grep -q rabbitmq_in_lms_network; then
-                        docker compose -f docker-compose-rabbitmq+postgres.yml up -d
-                    else
-                        echo "RabbitMQ container already running."
-                    fi
-
-                    if ! docker ps --format '{{.Names}}' | grep -q postgres_in_lms_network; then
-                        docker compose -f docker-compose-rabbitmq+postgres.yml up -d
-                    else
-                        echo "Postgres container already running."
-                    fi
-
-                    for i in $(seq 1 5)
-                    do
-                        echo "Attempt $i to Health-Check Postgres Container"
-                        if docker inspect --format='{{json .State.Health.Status}}' postgres_in_lms_network | grep healthy; then
-                            docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''users'\''" | grep -q 1 && echo "Database '\''users'\'' already initialized" || psql -U postgres -c "CREATE DATABASE users;"'
-                            docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''books'\''" | grep -q 1 && echo "Database '\''books'\'' already initialized" || psql -U postgres -c "CREATE DATABASE books;"'
-                            exit 0
+            steps {
+                script {
+                    sh '''
+                        if ! docker ps --format '{{.Names}}' | grep -q rabbitmq_in_lms_network; then
+                            docker compose -f docker-compose-rabbitmq+postgres.yml up -d
+                        else
+                            echo "RabbitMQ container already running."
                         fi
-                        sleep 10
-                    done
-                    echo "Postgres container failed to pass HealthChecks."
-                    exit 1
-                '''
+
+                        if ! docker ps --format '{{.Names}}' | grep -q postgres_in_lms_network; then
+                            docker compose -f docker-compose-rabbitmq+postgres.yml up -d
+                        else
+                            echo "Postgres container already running."
+                        fi
+
+                        for i in $(seq 1 5)
+                        do
+                            echo "Attempt $i to Health-Check Postgres Container"
+                            if docker inspect --format='{{json .State.Health.Status}}' postgres_in_lms_network | grep healthy; then
+                                docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''users'\''" | grep -q 1 && echo "Database '\''users'\'' already initialized" || psql -U postgres -c "CREATE DATABASE users;"'
+                                docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''books'\''" | grep -q 1 && echo "Database '\''books'\'' already initialized" || psql -U postgres -c "CREATE DATABASE books;"'
+                                exit 0
+                            fi
+                            sleep 10
+                        done
+                        echo "Postgres container failed to pass HealthChecks."
+                        exit 1
+                    '''
+                }
             }
         }
 
@@ -91,14 +93,14 @@ pipeline {
                 }
             }
         }
+    }
 
-        post {
-            success {
-                echo 'Pipeline completed successfully!'
-            }
-            failure {
-                echo 'Pipeline failed!'
-            }
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
         }
     }
 }
