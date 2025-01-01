@@ -55,7 +55,7 @@ pipeline {
 
         stage('Deploy Production Infrastructure') {
             script {
-                sh """
+                sh '''
                     if ! docker ps --format '{{.Names}}' | grep -q rabbitmq_in_lms_network; then
                         docker compose -f docker-compose-rabbitmq+postgres.yml up -d
                     else
@@ -80,7 +80,7 @@ pipeline {
                     done
                     echo "Postgres container failed to pass HealthChecks."
                     exit 1
-                """
+                '''
             }
         }
 
