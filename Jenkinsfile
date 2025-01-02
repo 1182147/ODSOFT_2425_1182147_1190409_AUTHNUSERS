@@ -23,13 +23,13 @@ pipeline {
             }
         }
 
-        stage('Clean Install') {
-            steps {
-                script {
-                    sh "mvn clean install -DskipTests"
-                }
-            }
-        }
+//         stage('Clean Install') {
+//             steps {
+//                 script {
+//                     sh "mvn clean install -DskipTests"
+//                 }
+//             }
+//         }
 
         stage('Docker Build') {
             steps {
