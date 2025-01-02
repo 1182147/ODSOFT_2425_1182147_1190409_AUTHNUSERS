@@ -69,7 +69,7 @@ pipeline {
                             echo "Postgres container already running."
                         fi
 
-                        for i in $(seq 1 5)
+                        for i in $(seq 1 10)
                         do
                             echo "Attempt $i to Health-Check Postgres Container"
                             if docker inspect --format='{{json .State.Health.Status}}' postgres_in_lms_network | grep healthy; then
