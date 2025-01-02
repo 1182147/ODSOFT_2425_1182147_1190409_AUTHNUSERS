@@ -73,8 +73,8 @@ pipeline {
                         do
                             echo "Attempt $i to Health-Check Postgres Container"
                             if docker inspect --format='{{json .State.Health.Status}}' postgres_in_lms_network | grep healthy; then
-                                docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''users'\''" | grep -q 1 && echo "Database '\''users'\'' already initialized" || psql -U postgres -c "CREATE DATABASE users;"'
-                                docker exec -it postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''books'\''" | grep -q 1 && echo "Database '\''books'\'' already initialized" || psql -U postgres -c "CREATE DATABASE books;"'
+                                docker exec -i postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''users'\''" | grep -q 1 && echo "Database '\''users'\'' already initialized" || psql -U postgres -c "CREATE DATABASE users;"'
+                                docker exec -i postgres_in_lms_network /bin/sh -c 'psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname = '\''books'\''" | grep -q 1 && echo "Database '\''books'\'' already initialized" || psql -U postgres -c "CREATE DATABASE books;"'
                                 exit 0
                             fi
                             sleep 10
