@@ -35,6 +35,7 @@ pipeline {
             steps {
                 script {
                     sh "echo $USER"
+                    sh "usermod -aG docker $USER"
                     sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
