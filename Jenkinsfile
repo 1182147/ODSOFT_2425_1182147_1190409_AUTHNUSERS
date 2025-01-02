@@ -26,7 +26,7 @@ pipeline {
         stage('Clean Install') {
             steps {
                 script {
-                    sh "mvn clean install"
+                    sh "mvn clean install -DskipTests"
                 }
             }
         }
@@ -34,7 +34,7 @@ pipeline {
         stage('Docker Build') {
             steps {
                 script {
-                    sh "docker build -t lmsusers ."
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} ."
                 }
             }
         }
